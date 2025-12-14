@@ -1,37 +1,146 @@
-import { type User, type InsertUser } from "@shared/schema";
 import { randomUUID } from "crypto";
-
-// modify the interface with any CRUD methods
-// you might need
+import type { 
+  Project, 
+  ChatMessage, 
+  Hook, 
+  ContentOutput, 
+  UserInputs,
+  ProjectStatusType 
+} from "@shared/schema";
 
 export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  createProject(): Promise<Project>;
+  getProject(id: string): Promise<Project | undefined>;
+  updateProject(id: string, updates: Partial<Project>): Promise<Project | undefined>;
+  addMessage(projectId: string, message: ChatMessage): Promise<Project | undefined>;
+  updateInputs(projectId: string, inputs: Partial<UserInputs>): Promise<Project | undefined>;
+  setHooks(projectId: string, hooks: Hook[]): Promise<Project | undefined>;
+  selectHook(projectId: string, hook: Hook): Promise<Project | undefined>;
+  setOutput(projectId: string, output: ContentOutput): Promise<Project | undefined>;
+  setStatus(projectId: string, status: ProjectStatusType): Promise<Project | undefined>;
 }
 
 export class MemStorage implements IStorage {
-  private users: Map<string, User>;
+  private projects: Map<string, Project>;
 
   constructor() {
-    this.users = new Map();
+    this.projects = new Map();
   }
 
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
+  async createProject(): Promise<Project> {
     const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+    const project: Project = {
+      id,
+      status: "inputting",
+      inputs: {},
+      messages: [],
+      hooks: undefined,
+      selectedHook: undefined,
+      output: undefined,
+      agents: undefined,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+    this.projects.set(id, project);
+    return project;
+  }
+
+  async getProject(id: string): Promise<Project | undefined> {
+    return this.projects.get(id);
+  }
+
+  async updateProject(id: string, updates: Partial<Project>): Promise<Project | undefined> {
+    const project = this.projects.get(id);
+    if (!project) return undefined;
+    
+    const updated = {
+      ...project,
+      ...updates,
+      updatedAt: Date.now()
+    };
+    this.projects.set(id, updated);
+    return updated;
+  }
+
+  async addMessage(projectId: string, message: ChatMessage): Promise<Project | undefined> {
+    const project = this.projects.get(projectId);
+    if (!project) return undefined;
+    
+    const updated = {
+      ...project,
+      messages: [...project.messages, message],
+      updatedAt: Date.now()
+    };
+    this.projects.set(projectId, updated);
+    return updated;
+  }
+
+  async updateInputs(projectId: string, inputs: Partial<UserInputs>): Promise<Project | undefined> {
+    const project = this.projects.get(projectId);
+    if (!project) return undefined;
+    
+    const updated = {
+      ...project,
+      inputs: { ...project.inputs, ...inputs },
+      updatedAt: Date.now()
+    };
+    this.projects.set(projectId, updated);
+    return updated;
+  }
+
+  async setHooks(projectId: string, hooks: Hook[]): Promise<Project | undefined> {
+    const project = this.projects.get(projectId);
+    if (!project) return undefined;
+    
+    const updated = {
+      ...project,
+      hooks,
+      status: "hook_selection" as ProjectStatusType,
+      updatedAt: Date.now()
+    };
+    this.projects.set(projectId, updated);
+    return updated;
+  }
+
+  async selectHook(projectId: string, hook: Hook): Promise<Project | undefined> {
+    const project = this.projects.get(projectId);
+    if (!project) return undefined;
+    
+    const updated = {
+      ...project,
+      selectedHook: hook,
+      status: "generating" as ProjectStatusType,
+      updatedAt: Date.now()
+    };
+    this.projects.set(projectId, updated);
+    return updated;
+  }
+
+  async setOutput(projectId: string, output: ContentOutput): Promise<Project | undefined> {
+    const project = this.projects.get(projectId);
+    if (!project) return undefined;
+    
+    const updated = {
+      ...project,
+      output,
+      status: "complete" as ProjectStatusType,
+      updatedAt: Date.now()
+    };
+    this.projects.set(projectId, updated);
+    return updated;
+  }
+
+  async setStatus(projectId: string, status: ProjectStatusType): Promise<Project | undefined> {
+    const project = this.projects.get(projectId);
+    if (!project) return undefined;
+    
+    const updated = {
+      ...project,
+      status,
+      updatedAt: Date.now()
+    };
+    this.projects.set(projectId, updated);
+    return updated;
   }
 }
 
