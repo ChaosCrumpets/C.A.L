@@ -280,16 +280,41 @@ Generate 6 hooks with unique ranks (1-6, where 1 is best). The rank=1 hook shoul
       throw new Error('Invalid hooks response format');
     }
 
-    return {
-      hooks: parsed.hooks.map((hook: { id?: string; type: string; text: string; preview: string; rank?: number; isRecommended?: boolean }, index: number) => ({
-        id: hook.id || `hook-${index + 1}`,
-        type: hook.type,
-        text: hook.text,
-        preview: hook.preview,
-        rank: hook.rank || (index + 1),
-        isRecommended: hook.isRecommended || (hook.rank === 1)
-      }))
-    };
+    const rawHooks = parsed.hooks.map((hook: { id?: string; type: string; text: string; preview: string; rank?: number; isRecommended?: boolean }, index: number) => ({
+      id: hook.id || `hook-${index + 1}`,
+      type: hook.type || 'INSIGHT',
+      text: hook.text || '',
+      preview: hook.preview || '',
+      rank: hook.rank,
+      isRecommended: hook.isRecommended
+    }));
+
+    const usedRanks = new Set<number>();
+    const validatedHooks = rawHooks.map((hook: { id: string; type: string; text: string; preview: string; rank?: number; isRecommended?: boolean }, index: number) => {
+      let rank = hook.rank;
+      
+      if (typeof rank !== 'number' || rank < 1 || rank > 6 || usedRanks.has(rank)) {
+        for (let r = 1; r <= 6; r++) {
+          if (!usedRanks.has(r)) {
+            rank = r;
+            break;
+          }
+        }
+        if (!rank) rank = index + 1;
+      }
+      
+      usedRanks.add(rank);
+      
+      return {
+        ...hook,
+        rank,
+        isRecommended: rank === 1
+      };
+    });
+
+    validatedHooks.sort((a: { rank: number }, b: { rank: number }) => a.rank - b.rank);
+
+    return { hooks: validatedHooks };
   } catch (error) {
     console.error('Gemini hooks error:', error);
     throw new Error('Failed to generate hooks');
