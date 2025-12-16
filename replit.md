@@ -13,6 +13,17 @@ The system follows a state-machine pattern with seven distinct phases:
 6. **generating** - AI agents produce the content package
 7. **complete** - View final output with script, storyboard, tech specs, B-roll (with AI generation prompts), and captions
 
+### Complete Stage Features
+The complete stage has a split-view layout:
+- **Left Panel (Edit Content)**: Chat interface for editing the generated content. Users can request changes like "make the script more energetic" and the AI will apply those edits.
+- **Right Panel (Content Output)**: Tabbed view of Script, Storyboard, Tech Specs, B-Roll, and Captions.
+
+Two ways to start a new content plan:
+- "New Plan" button in the Edit Content header
+- "Create New Content Plan" button next to the Content Output title
+
+The edit chat uses a separate message thread (`editMessages`) from the initial creation chat, keeping the workflows distinct.
+
 ### B-Roll AI Prompts
 Each B-roll suggestion now includes three output types:
 - **FIY (Film It Yourself)**: Practical filming instructions
@@ -60,6 +71,7 @@ Preferred communication style: Simple, everyday language.
 - `POST /api/generate-verbal-hooks` - Generates 6 ranked verbal hook options (script openers)
 - `POST /api/generate-visual-hooks` - Generates 6 ranked visual hook options with filming context (dual output: FIY + GenAI)
 - `POST /api/generate-content-multi` - Produces full content package using all three selected hooks
+- `POST /api/edit-content` - Edits existing content output based on user message (for post-generation refinement)
 - `POST /api/generate-hooks` - (Legacy) Generates 5-6 hook options based on collected inputs
 - `POST /api/generate-content` - (Legacy) Produces full content package after single hook selection
 
