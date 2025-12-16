@@ -4,7 +4,14 @@
 
 C.A.L. is a social media content generation platform that uses AI to help creators produce high-quality short-form video content. The application guides users through a conversational workflow: gathering content requirements via chat, generating multiple hook options, allowing the user to select a hook, and then producing a complete content package including script, storyboard, B-roll suggestions, tech specs, and captions.
 
-The system follows a state-machine pattern with four distinct phases: inputting → hook_selection → generating → complete.
+The system follows a state-machine pattern with seven distinct phases:
+1. **inputting** - Conversational chat to gather content requirements
+2. **hook_text** - Select from 6 ranked text hooks (on-screen captions/titles)
+3. **hook_verbal** - Select from 6 ranked verbal hooks (script openers)
+4. **hook_visual** - Provide filming context, then select from 6 visual hooks (dual output: FIY filming guide + GenAI prompt)
+5. **hook_overview** - Review all 3 hook selections before final generation
+6. **generating** - AI agents produce the content package
+7. **complete** - View final output with script, storyboard, tech specs, B-roll, and captions
 
 ## User Preferences
 
@@ -39,8 +46,12 @@ Preferred communication style: Simple, everyday language.
 
 ### API Endpoints
 - `POST /api/chat` - Conversational input gathering with extracted parameters
-- `POST /api/generate-hooks` - Generates 5-6 hook options based on collected inputs
-- `POST /api/generate-content` - Produces full content package after hook selection
+- `POST /api/generate-text-hooks` - Generates 6 ranked text hook options (on-screen captions/titles)
+- `POST /api/generate-verbal-hooks` - Generates 6 ranked verbal hook options (script openers)
+- `POST /api/generate-visual-hooks` - Generates 6 ranked visual hook options with filming context (dual output: FIY + GenAI)
+- `POST /api/generate-content-multi` - Produces full content package using all three selected hooks
+- `POST /api/generate-hooks` - (Legacy) Generates 5-6 hook options based on collected inputs
+- `POST /api/generate-content` - (Legacy) Produces full content package after single hook selection
 
 ## External Dependencies
 
