@@ -1,12 +1,15 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { useProjectStore } from '@/lib/store';
 import { ChatInterface } from '@/components/ChatInterface';
-import { HookSelection } from '@/components/HookSelection';
+import { TextHookStage } from '@/components/TextHookStage';
+import { VerbalHookStage } from '@/components/VerbalHookStage';
+import { VisualHookStage } from '@/components/VisualHookStage';
+import { HookOverviewStage } from '@/components/HookOverviewStage';
 import { ThinkingState } from '@/components/ThinkingState';
 import { SplitDashboard } from '@/components/SplitDashboard';
 import { StatusBar } from '@/components/StatusBar';
 import { ProjectStatus } from '@shared/schema';
-import type { Hook, ChatMessage, AgentStatus, UserInputs } from '@shared/schema';
+import type { TextHook, VerbalHook, VisualHook, ChatMessage, AgentStatus, UserInputs, VisualContext } from '@shared/schema';
 import { apiRequest } from '@/lib/queryClient';
 
 export default function AssemblyLine() {
@@ -15,10 +18,16 @@ export default function AssemblyLine() {
     initProject, 
     addMessage, 
     updateInputs,
-    setHooks, 
-    selectHook, 
+    setVisualContext,
+    setTextHooks,
+    setVerbalHooks,
+    setVisualHooks,
+    selectTextHook,
+    selectVerbalHook,
+    selectVisualHook,
     setOutput,
     setStatus,
+    goToStage,
     setAgents,
     updateAgent,
     isLoading, 
@@ -26,54 +35,125 @@ export default function AssemblyLine() {
     setError
   } = useProjectStore();
 
+  const [showVisualContextForm, setShowVisualContextForm] = useState(true);
+  const [localVisualContext, setLocalVisualContext] = useState<VisualContext>({
+    location: undefined,
+    lighting: undefined,
+    onCamera: true
+  });
+
   useEffect(() => {
     if (!project) {
       initProject();
     }
   }, [project, initProject]);
 
-  const generateHooks = useCallback(async (inputsOverride?: Partial<UserInputs>) => {
+  const generateTextHooks = useCallback(async (inputsOverride?: Partial<UserInputs>) => {
     if (!project) return;
 
     setLoading(true);
     setStatus(ProjectStatus.GENERATING);
     
     const hookAgents: AgentStatus[] = [
-      { name: 'Hook Engineer', status: 'working', task: 'Analyzing topic for hook angles' }
+      { name: 'Text Hook Engineer', status: 'working', task: 'Crafting scroll-stopping text hooks' }
     ];
     setAgents(hookAgents);
 
     const inputsToUse = inputsOverride || project.inputs;
 
     try {
-      const response = await apiRequest('POST', '/api/generate-hooks', {
-        projectId: project.id,
+      const response = await apiRequest('POST', '/api/generate-text-hooks', {
         inputs: inputsToUse
       });
 
       const data = await response.json();
       
-      updateAgent('Hook Engineer', 'complete', 'Generated hook options');
+      updateAgent('Text Hook Engineer', 'complete', 'Generated text hook options');
       
-      if (data.hooks && data.hooks.length > 0) {
-        setHooks(data.hooks);
+      if (data.textHooks && data.textHooks.length > 0) {
+        setTextHooks(data.textHooks);
         
         const hookMessage: ChatMessage = {
           id: crypto.randomUUID(),
           role: 'assistant',
-          content: `I've generated ${data.hooks.length} hook options for your content. Select the one that best captures your audience's attention.`,
+          content: `I've generated ${data.textHooks.length} text hook options. These are the on-screen text that will appear first - on thumbnails, title cards, and caption overlays. Select the one that best grabs attention.`,
           timestamp: Date.now()
         };
         addMessage(hookMessage);
       }
     } catch (error) {
-      console.error('Hook generation error:', error);
-      setError('Failed to generate hooks. Please try again.');
+      console.error('Text hook generation error:', error);
+      setError('Failed to generate text hooks. Please try again.');
       setStatus(ProjectStatus.INPUTTING);
     } finally {
       setLoading(false);
     }
-  }, [project, setLoading, setStatus, setAgents, updateAgent, setHooks, addMessage, setError]);
+  }, [project, setLoading, setStatus, setAgents, updateAgent, setTextHooks, addMessage, setError]);
+
+  const generateVerbalHooks = useCallback(async () => {
+    if (!project) return;
+
+    setLoading(true);
+    setStatus(ProjectStatus.GENERATING);
+    
+    const hookAgents: AgentStatus[] = [
+      { name: 'Verbal Hook Engineer', status: 'working', task: 'Crafting compelling script openers' }
+    ];
+    setAgents(hookAgents);
+
+    try {
+      const response = await apiRequest('POST', '/api/generate-verbal-hooks', {
+        inputs: project.inputs
+      });
+
+      const data = await response.json();
+      
+      updateAgent('Verbal Hook Engineer', 'complete', 'Generated verbal hook options');
+      
+      if (data.verbalHooks && data.verbalHooks.length > 0) {
+        setVerbalHooks(data.verbalHooks);
+      }
+    } catch (error) {
+      console.error('Verbal hook generation error:', error);
+      setError('Failed to generate verbal hooks. Please try again.');
+      setStatus(ProjectStatus.HOOK_TEXT);
+    } finally {
+      setLoading(false);
+    }
+  }, [project, setLoading, setStatus, setAgents, updateAgent, setVerbalHooks, setError]);
+
+  const generateVisualHooks = useCallback(async (context: VisualContext) => {
+    if (!project) return;
+
+    setLoading(true);
+    setVisualContext(context);
+    
+    const hookAgents: AgentStatus[] = [
+      { name: 'Visual Hook Director', status: 'working', task: 'Designing opening visuals' }
+    ];
+    setAgents(hookAgents);
+
+    try {
+      const response = await apiRequest('POST', '/api/generate-visual-hooks', {
+        inputs: project.inputs,
+        visualContext: context
+      });
+
+      const data = await response.json();
+      
+      updateAgent('Visual Hook Director', 'complete', 'Generated visual hook options');
+      
+      if (data.visualHooks && data.visualHooks.length > 0) {
+        setVisualHooks(data.visualHooks);
+        setShowVisualContextForm(false);
+      }
+    } catch (error) {
+      console.error('Visual hook generation error:', error);
+      setError('Failed to generate visual hooks. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, [project, setLoading, setVisualContext, setAgents, updateAgent, setVisualHooks, setError]);
 
   const handleSendMessage = useCallback(async (content: string) => {
     if (!project) return;
@@ -118,7 +198,7 @@ export default function AssemblyLine() {
       }
 
       if (data.readyForHooks) {
-        await generateHooks(updatedInputs);
+        await generateTextHooks(updatedInputs);
       }
     } catch (error) {
       console.error('Chat error:', error);
@@ -134,13 +214,44 @@ export default function AssemblyLine() {
     } finally {
       setLoading(false);
     }
-  }, [project, addMessage, updateInputs, setLoading, setError, generateHooks]);
+  }, [project, addMessage, updateInputs, setLoading, setError, generateTextHooks]);
 
-  const handleSelectHook = useCallback(async (hook: Hook) => {
+  const handleSelectTextHook = useCallback(async (hook: TextHook) => {
     if (!project) return;
+    selectTextHook(hook);
+    await generateVerbalHooks();
+  }, [project, selectTextHook, generateVerbalHooks]);
 
-    selectHook(hook);
+  const handleSelectVerbalHook = useCallback((hook: VerbalHook) => {
+    if (!project) return;
+    selectVerbalHook(hook);
+    setShowVisualContextForm(true);
+    setStatus(ProjectStatus.HOOK_VISUAL);
+  }, [project, selectVerbalHook, setStatus]);
+
+  const handleSelectVisualHook = useCallback((hook: VisualHook) => {
+    if (!project) return;
+    selectVisualHook(hook);
+    setStatus(ProjectStatus.HOOK_OVERVIEW);
+  }, [project, selectVisualHook, setStatus]);
+
+  const handleEditFromOverview = useCallback((stage: 'text' | 'verbal' | 'visual') => {
+    const stageMap = {
+      text: ProjectStatus.HOOK_TEXT,
+      verbal: ProjectStatus.HOOK_VERBAL,
+      visual: ProjectStatus.HOOK_VISUAL
+    };
+    goToStage(stageMap[stage]);
+    if (stage === 'visual') {
+      setShowVisualContextForm(false);
+    }
+  }, [goToStage]);
+
+  const handleConfirmAndGenerate = useCallback(async () => {
+    if (!project || !project.selectedHooks) return;
+
     setLoading(true);
+    setStatus(ProjectStatus.GENERATING);
     
     const contentAgents: AgentStatus[] = [
       { name: 'Script Architect', status: 'working', task: 'Drafting narrative structure' },
@@ -152,10 +263,9 @@ export default function AssemblyLine() {
     setAgents(contentAgents);
 
     try {
-      const response = await apiRequest('POST', '/api/generate-content', {
-        projectId: project.id,
+      const response = await apiRequest('POST', '/api/generate-content-multi', {
         inputs: project.inputs,
-        selectedHook: hook
+        selectedHooks: project.selectedHooks
       });
 
       const data = await response.json();
@@ -184,11 +294,11 @@ export default function AssemblyLine() {
     } catch (error) {
       console.error('Content generation error:', error);
       setError('Failed to generate content. Please try again.');
-      setStatus(ProjectStatus.HOOK_SELECTION);
+      setStatus(ProjectStatus.HOOK_OVERVIEW);
     } finally {
       setLoading(false);
     }
-  }, [project, selectHook, setLoading, setAgents, updateAgent, setOutput, addMessage, setError, setStatus]);
+  }, [project, setLoading, setStatus, setAgents, updateAgent, setOutput, addMessage, setError]);
 
   if (!project) {
     return (
@@ -211,27 +321,62 @@ export default function AssemblyLine() {
           </div>
         );
 
-      case ProjectStatus.HOOK_SELECTION:
+      case ProjectStatus.HOOK_TEXT:
         return (
           <div className="flex-1 overflow-auto">
-            <div className="max-w-3xl mx-auto px-4">
-              <ChatInterface
-                messages={project.messages}
-                onSendMessage={handleSendMessage}
-                isLoading={isLoading}
-                disabled
+            {project.textHooks && project.textHooks.length > 0 && (
+              <TextHookStage
+                hooks={project.textHooks}
+                onSelectHook={handleSelectTextHook}
+                selectedHookId={project.selectedHooks?.text?.id}
+                disabled={isLoading}
               />
-            </div>
-            {project.hooks && project.hooks.length > 0 && (
-              <div className="px-4 pb-8">
-                <HookSelection
-                  hooks={project.hooks}
-                  onSelectHook={handleSelectHook}
-                  selectedHookId={project.selectedHook?.id}
-                  disabled={isLoading}
-                />
-              </div>
             )}
+          </div>
+        );
+
+      case ProjectStatus.HOOK_VERBAL:
+        return (
+          <div className="flex-1 overflow-auto">
+            {project.verbalHooks && project.verbalHooks.length > 0 && (
+              <VerbalHookStage
+                hooks={project.verbalHooks}
+                onSelectHook={handleSelectVerbalHook}
+                selectedHookId={project.selectedHooks?.verbal?.id}
+                disabled={isLoading}
+              />
+            )}
+          </div>
+        );
+
+      case ProjectStatus.HOOK_VISUAL:
+        return (
+          <div className="flex-1 overflow-auto">
+            <VisualHookStage
+              hooks={project.visualHooks || []}
+              onSelectHook={handleSelectVisualHook}
+              selectedHookId={project.selectedHooks?.visual?.id}
+              disabled={isLoading}
+              visualContext={localVisualContext}
+              onVisualContextChange={setLocalVisualContext}
+              showContextForm={showVisualContextForm}
+              onContextSubmit={() => generateVisualHooks(localVisualContext)}
+              isLoadingHooks={isLoading}
+            />
+          </div>
+        );
+
+      case ProjectStatus.HOOK_OVERVIEW:
+        return (
+          <div className="flex-1 overflow-auto">
+            <HookOverviewStage
+              textHook={project.selectedHooks?.text}
+              verbalHook={project.selectedHooks?.verbal}
+              visualHook={project.selectedHooks?.visual}
+              onEdit={handleEditFromOverview}
+              onConfirm={handleConfirmAndGenerate}
+              disabled={isLoading}
+            />
           </div>
         );
 

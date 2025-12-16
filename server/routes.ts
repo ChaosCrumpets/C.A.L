@@ -32,7 +32,14 @@ export async function registerRoutes(
       const response = await chat(message, conversationHistory, inputs || {});
 
       if (projectId && response.extractedInputs) {
-        await storage.updateInputs(projectId, response.extractedInputs);
+        await storage.updateInputs(projectId, response.extractedInputs as Partial<{
+          topic?: string;
+          goal?: "educate" | "entertain" | "promote" | "inspire" | "inform";
+          platforms?: ("tiktok" | "instagram" | "youtube_shorts" | "twitter" | "linkedin")[];
+          targetAudience?: string;
+          tone?: string;
+          duration?: string;
+        }>);
       }
 
       res.json(response);
