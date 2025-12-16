@@ -154,13 +154,15 @@ export const techSpecsSchema = z.object({
 
 export type TechSpecs = z.infer<typeof techSpecsSchema>;
 
-// B-Roll suggestion schema
+// B-Roll suggestion schema with AI generation prompts
 export const bRollItemSchema = z.object({
   id: z.string(),
   description: z.string(),
   source: z.string(),
   timestamp: z.string().optional(),
-  keywords: z.array(z.string()).optional()
+  keywords: z.array(z.string()).optional(),
+  imagePrompt: z.string().optional(),
+  videoPrompt: z.string().optional()
 });
 
 export type BRollItem = z.infer<typeof bRollItemSchema>;

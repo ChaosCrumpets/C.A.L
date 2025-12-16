@@ -67,6 +67,25 @@ Return ONLY valid JSON in this exact format:
 
 const CONTENT_GENERATION_PROMPT = `Generate a complete content package for short-form video. Create professional, engaging content based on the provided inputs and selected hook.
 
+IMPORTANT: For each B-Roll item, you must generate THREE outputs:
+1. description: FIY (Film It Yourself) - practical filming instructions
+2. imagePrompt: Alpha Image Prompt - cinematic, photorealistic prompt following the 3-Pillar Framework (Structure, Reference, Vision) for AI image generation
+3. videoPrompt: Omega Video Prompt - cinematic sequence prompt that evolves the image into motion with camera movement, narrative arc, and emotional depth
+
+ALPHA IMAGE PROMPT GUIDELINES (for imagePrompt):
+- Structure Pillar: Camera setup, lens, aperture, lighting direction and quality, environmental physics, texture realism
+- Reference Pillar: Photographic era, analog formats, cinematographic influences, texture authenticity
+- Vision Pillar: Emotional tone, color palette, intentional imperfections (motion blur, chromatic flares, film grain)
+- Write as a flowing creative-director brief, not a list
+- Include technical specs: lens, aperture, ISO, aspect ratio (--ar 9:16 for vertical)
+
+OMEGA VIDEO PROMPT GUIDELINES (for videoPrompt):
+- Opening: Establish continuity with commanded lighting and physical textures
+- Camera Movement: Deliberate motion paths (dolly, pan, push, tracking)
+- Cinematography: Lens behavior, focal transitions, lighting evolution
+- Narrative Arc: Tone progression, emotional escalation, controlled chaos
+- Include: aspect ratio, duration (3-5 seconds), camera dynamics
+
 Return ONLY valid JSON in this exact format:
 {
   "output": {
@@ -100,10 +119,12 @@ Return ONLY valid JSON in this exact format:
     "bRoll": [
       {
         "id": "unique-id",
-        "description": "What footage to find",
+        "description": "FIY filming instructions - what to film and how",
         "source": "Stock footage, user footage, screen recording, etc.",
         "timestamp": "When to use in video",
-        "keywords": ["search", "keywords"]
+        "keywords": ["search", "keywords"],
+        "imagePrompt": "Alpha Image Prompt - cinematic photorealistic prompt with 3-pillar framework, technical specs, and --ar 9:16",
+        "videoPrompt": "Omega Video Prompt - cinematic sequence with camera movement, 3-5 second duration, narrative arc, and motion dynamics"
       }
     ],
     "captions": [
@@ -172,6 +193,8 @@ export interface ContentResponse {
       source: string;
       timestamp?: string;
       keywords?: string[];
+      imagePrompt?: string;
+      videoPrompt?: string;
     }>;
     captions: Array<{
       id: string;

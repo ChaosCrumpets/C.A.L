@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Film, Settings, Video, MessageSquare } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { FileText, Film, Settings, Video, MessageSquare, Camera, ImageIcon, Clapperboard, Copy, Check } from 'lucide-react';
 import type { ContentOutput, ScriptLine, StoryboardFrame, TechSpecs, BRollItem, Caption } from '@shared/schema';
 
 interface OutputPanelsProps {
@@ -189,38 +191,145 @@ function TechSpecsPanel({ specs }: { specs: TechSpecs }) {
   );
 }
 
+type BRollOutputType = 'fiy' | 'image' | 'video';
+
 function BRollPanel({ items }: { items: BRollItem[] }) {
+  const [selectedTypes, setSelectedTypes] = useState<Record<string, BRollOutputType>>({});
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const getSelectedType = (id: string): BRollOutputType => selectedTypes[id] || 'fiy';
+
+  const setSelectedType = (id: string, type: BRollOutputType) => {
+    setSelectedTypes(prev => ({ ...prev, [id]: type }));
+  };
+
+  const copyToClipboard = async (text: string, id: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  const getContent = (item: BRollItem, type: BRollOutputType): string => {
+    switch (type) {
+      case 'fiy':
+        return item.description;
+      case 'image':
+        return item.imagePrompt || 'Image prompt not available for this clip.';
+      case 'video':
+        return item.videoPrompt || 'Video prompt not available for this clip.';
+    }
+  };
+
+  const getContentLabel = (type: BRollOutputType): string => {
+    switch (type) {
+      case 'fiy':
+        return 'Film It Yourself Instructions';
+      case 'image':
+        return 'Alpha Image Prompt';
+      case 'video':
+        return 'Omega Video Prompt';
+    }
+  };
+
   return (
     <div data-testid="panel-broll">
       <PanelHeader title="B-Roll Suggestions" count={items.length} unit="clips" />
       
       <div className="space-y-4 mt-6">
-        {items.map((item) => (
-          <Card key={item.id} className="p-4 border-card-border">
-            <div className="flex items-start justify-between gap-4 mb-2">
-              <span className="text-sm font-medium">{item.description}</span>
-              {item.timestamp && (
-                <span className="text-xs font-mono text-muted-foreground shrink-0">
-                  {item.timestamp}
-                </span>
-              )}
-            </div>
-            
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span>Source: {item.source}</span>
-            </div>
-            
-            {item.keywords && item.keywords.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-3">
-                {item.keywords.map((keyword) => (
-                  <Badge key={keyword} variant="outline" className="text-xs">
-                    {keyword}
-                  </Badge>
-                ))}
+        {items.map((item) => {
+          const currentType = getSelectedType(item.id);
+          const content = getContent(item, currentType);
+          const copyId = `${item.id}-${currentType}`;
+          const hasPrompts = item.imagePrompt || item.videoPrompt;
+          
+          return (
+            <Card key={item.id} className="p-4 border-card-border" data-testid={`broll-item-${item.id}`}>
+              <div className="flex items-start justify-between gap-4 mb-3">
+                <div className="flex-1">
+                  {item.timestamp && (
+                    <span className="text-xs font-mono text-muted-foreground block mb-1">
+                      {item.timestamp}
+                    </span>
+                  )}
+                  <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                    {getContentLabel(currentType)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
+                  <span>Source: {item.source}</span>
+                </div>
               </div>
-            )}
-          </Card>
-        ))}
+              
+              <div className="bg-muted/30 rounded-md p-3 mb-3 relative group">
+                <p className="text-sm leading-relaxed pr-8">{content}</p>
+                {(currentType === 'image' || currentType === 'video') && hasPrompts && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => copyToClipboard(content, copyId)}
+                    data-testid={`button-copy-${item.id}`}
+                  >
+                    {copiedId === copyId ? (
+                      <Check className="w-4 h-4 text-green-500" />
+                    ) : (
+                      <Copy className="w-4 h-4" />
+                    )}
+                  </Button>
+                )}
+              </div>
+              
+              {item.keywords && item.keywords.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-3">
+                  {item.keywords.map((keyword) => (
+                    <Badge key={keyword} variant="outline" className="text-xs">
+                      {keyword}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              
+              <div className="flex items-center justify-end gap-1 pt-2 border-t border-border">
+                <Button
+                  size="sm"
+                  variant={currentType === 'fiy' ? 'default' : 'ghost'}
+                  onClick={() => setSelectedType(item.id, 'fiy')}
+                  className="text-xs"
+                  data-testid={`button-fiy-${item.id}`}
+                >
+                  <Camera className="w-3 h-3 mr-1" />
+                  FIY
+                </Button>
+                <Button
+                  size="sm"
+                  variant={currentType === 'image' ? 'default' : 'ghost'}
+                  onClick={() => setSelectedType(item.id, 'image')}
+                  className="text-xs"
+                  disabled={!item.imagePrompt}
+                  data-testid={`button-image-${item.id}`}
+                >
+                  <ImageIcon className="w-3 h-3 mr-1" />
+                  Image Prompt
+                </Button>
+                <Button
+                  size="sm"
+                  variant={currentType === 'video' ? 'default' : 'ghost'}
+                  onClick={() => setSelectedType(item.id, 'video')}
+                  className="text-xs"
+                  disabled={!item.videoPrompt}
+                  data-testid={`button-video-${item.id}`}
+                >
+                  <Clapperboard className="w-3 h-3 mr-1" />
+                  Video Prompt
+                </Button>
+              </div>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );
