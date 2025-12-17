@@ -212,9 +212,9 @@ export const sessionStorage = {
       .orderBy(desc(sessions.createdAt));
   },
 
-  async updateSession(id: number, updates: Partial<InsertSession>): Promise<Session | undefined> {
+  async updateSession(id: number, updates: Record<string, unknown>): Promise<Session | undefined> {
     const [session] = await db.update(sessions)
-      .set({ ...updates, updatedAt: new Date() })
+      .set({ ...updates, updatedAt: new Date() } as Partial<typeof sessions.$inferInsert>)
       .where(eq(sessions.id, id))
       .returning();
     return session;

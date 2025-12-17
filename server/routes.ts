@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { storage, sessionStorage } from "./storage";
 import { 
   chat, 
   generateHooks, 
@@ -237,6 +237,120 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Project fetch error:", error);
       res.status(500).json({ error: "Failed to fetch project" });
+    }
+  });
+
+  // ============================================
+  // Session API Endpoints (Database-backed)
+  // ============================================
+
+  app.get("/api/sessions", async (req, res) => {
+    try {
+      const sessions = await sessionStorage.listSessions();
+      res.json(sessions);
+    } catch (error) {
+      console.error("Sessions list error:", error);
+      res.status(500).json({ error: "Failed to fetch sessions" });
+    }
+  });
+
+  app.post("/api/sessions", async (req, res) => {
+    try {
+      const session = await sessionStorage.createSession();
+      res.json(session);
+    } catch (error) {
+      console.error("Session creation error:", error);
+      res.status(500).json({ error: "Failed to create session" });
+    }
+  });
+
+  app.get("/api/sessions/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid session ID" });
+      }
+      const sessionData = await sessionStorage.getSessionWithMessages(id);
+      if (!sessionData) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+      res.json(sessionData);
+    } catch (error) {
+      console.error("Session fetch error:", error);
+      res.status(500).json({ error: "Failed to fetch session" });
+    }
+  });
+
+  app.patch("/api/sessions/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid session ID" });
+      }
+      const session = await sessionStorage.updateSession(id, req.body);
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+      res.json(session);
+    } catch (error) {
+      console.error("Session update error:", error);
+      res.status(500).json({ error: "Failed to update session" });
+    }
+  });
+
+  app.patch("/api/sessions/:id/title", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { title } = req.body;
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid session ID" });
+      }
+      if (!title) {
+        return res.status(400).json({ error: "Title is required" });
+      }
+      const session = await sessionStorage.updateSessionTitle(id, title);
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+      res.json(session);
+    } catch (error) {
+      console.error("Session title update error:", error);
+      res.status(500).json({ error: "Failed to update session title" });
+    }
+  });
+
+  app.post("/api/sessions/:id/messages", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { role, content, isEditMessage } = req.body;
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid session ID" });
+      }
+      if (!role || !content) {
+        return res.status(400).json({ error: "Role and content are required" });
+      }
+      const message = await sessionStorage.addMessage(id, role, content, isEditMessage || false);
+      res.json(message);
+    } catch (error) {
+      console.error("Message creation error:", error);
+      res.status(500).json({ error: "Failed to add message" });
+    }
+  });
+
+  app.delete("/api/sessions/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid session ID" });
+      }
+      const deleted = await sessionStorage.deleteSession(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Session delete error:", error);
+      res.status(500).json({ error: "Failed to delete session" });
     }
   });
 
