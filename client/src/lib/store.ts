@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import type { 
   Project, ChatMessage, Hook, ContentOutput, AgentStatus, UserInputs, ProjectStatusType,
-  TextHook, VerbalHook, VisualHook, SelectedHooks, VisualContext
+  TextHook, VerbalHook, VisualHook, SelectedHooks, VisualContext,
+  Session, SessionMessage
 } from '@shared/schema';
 import { ProjectStatus } from '@shared/schema';
 
@@ -10,6 +11,7 @@ interface ProjectStore {
   isLoading: boolean;
   error: string | null;
   editMessages: ChatMessage[];
+  currentSessionId: number | null;
   
   initProject: () => void;
   addMessage: (message: ChatMessage) => void;
@@ -33,6 +35,8 @@ interface ProjectStore {
   setError: (error: string | null) => void;
   goToStage: (stage: ProjectStatusType) => void;
   reset: () => void;
+  setCurrentSessionId: (id: number | null) => void;
+  loadSession: (session: Session, messages: SessionMessage[], editMessages: SessionMessage[]) => void;
 }
 
 const createInitialProject = (): Project => ({
@@ -58,13 +62,15 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   isLoading: false,
   error: null,
   editMessages: [],
+  currentSessionId: null,
 
   initProject: () => {
     set({ 
       project: createInitialProject(),
       isLoading: false,
       error: null,
-      editMessages: []
+      editMessages: [],
+      currentSessionId: null
     });
   },
 
@@ -313,6 +319,51 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     project: createInitialProject(),
     isLoading: false,
     error: null,
-    editMessages: []
-  })
+    editMessages: [],
+    currentSessionId: null
+  }),
+
+  setCurrentSessionId: (id: number | null) => set({ currentSessionId: id }),
+
+  loadSession: (session: Session, messages: SessionMessage[], editMsgs: SessionMessage[]) => {
+    const chatMessages: ChatMessage[] = messages.map(m => ({
+      id: m.id.toString(),
+      role: m.role as 'user' | 'assistant',
+      content: m.content,
+      timestamp: new Date(m.timestamp).getTime()
+    }));
+
+    const editMessages: ChatMessage[] = editMsgs.map(m => ({
+      id: m.id.toString(),
+      role: m.role as 'user' | 'assistant',
+      content: m.content,
+      timestamp: new Date(m.timestamp).getTime()
+    }));
+
+    const project: Project = {
+      id: session.id.toString(),
+      status: (session.status as ProjectStatusType) || ProjectStatus.INPUTTING,
+      inputs: session.inputs || {},
+      visualContext: session.visualContext || undefined,
+      messages: chatMessages,
+      textHooks: session.textHooks || undefined,
+      verbalHooks: session.verbalHooks || undefined,
+      visualHooks: session.visualHooks || undefined,
+      selectedHooks: session.selectedHooks || undefined,
+      hooks: undefined,
+      selectedHook: session.selectedHook || undefined,
+      output: session.output || undefined,
+      agents: undefined,
+      createdAt: new Date(session.createdAt).getTime(),
+      updatedAt: new Date(session.updatedAt).getTime()
+    };
+
+    set({
+      project,
+      editMessages,
+      currentSessionId: session.id,
+      isLoading: false,
+      error: null
+    });
+  }
 }));
