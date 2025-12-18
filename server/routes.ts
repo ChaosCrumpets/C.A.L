@@ -23,7 +23,7 @@ export async function registerRoutes(
   
   app.post("/api/chat", async (req, res) => {
     try {
-      const { projectId, message, inputs, messages } = req.body;
+      const { projectId, message, inputs, messages, discoveryComplete } = req.body;
 
       if (!message) {
         return res.status(400).json({ error: "Message is required" });
@@ -34,7 +34,7 @@ export async function registerRoutes(
         content: msg.content
       }));
 
-      const response = await chat(message, conversationHistory, inputs || {});
+      const response = await chat(message, conversationHistory, inputs || {}, discoveryComplete);
 
       if (projectId && response.extractedInputs) {
         await storage.updateInputs(projectId, response.extractedInputs as Partial<{

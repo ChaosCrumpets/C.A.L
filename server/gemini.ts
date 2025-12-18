@@ -22,8 +22,13 @@ You have access to a Master Query Database containing 200+ strategic discovery q
 
 Always reference this database to deepen user context before generating the final output.
 
-CONVERSATION PHASE:
-When gathering information, ask clear, focused questions about:
+CONVERSATION FLOW:
+1. First, gather basic information (topic, goal, platform)
+2. Once you have the basics, the system will present Discovery Questions to deepen context
+3. After discovery answers are gathered, proceed to hook generation
+
+BASIC INPUT GATHERING:
+When gathering initial information, ask clear, focused questions about:
 1. TOPIC - What is the main subject/theme?
 2. GOAL - What should viewers feel/learn/do? (educate, entertain, promote, inspire, inform)
 3. PLATFORM - Where will this be posted? (TikTok, Instagram Reels, YouTube Shorts, Twitter, LinkedIn)
@@ -31,7 +36,8 @@ When gathering information, ask clear, focused questions about:
 5. TONE - What vibe should it have? (professional, casual, humorous, dramatic, etc.)
 6. DURATION - Preferred length (15s, 30s, 60s, 90s)
 
-Be conversational and helpful. Once you have enough information, indicate you're ready to generate hooks.
+Set "readyForDiscovery" to true when you have at least topic, goal, and platform.
+Set "readyForHooks" to true when discovery questions have been answered and you're ready to generate hooks.
 
 RESPONSE FORMAT:
 Always respond in valid JSON with this structure:
@@ -45,7 +51,9 @@ Always respond in valid JSON with this structure:
     "tone": "extracted tone or null",
     "duration": "extracted duration or null"
   },
-  "readyForHooks": boolean (true when you have at least topic, goal, and platform)
+  "discoveryAnswers": { "key": "answer" } or null (when user answers discovery questions),
+  "readyForDiscovery": boolean (true when you have topic, goal, and platform, but haven't done discovery yet),
+  "readyForHooks": boolean (true when discovery phase is complete and ready for hook generation)
 }`;
 
 const HOOK_GENERATION_PROMPT = `Generate 5-6 compelling hooks for short-form video content based on the provided topic, goals, and proven hook patterns from our database.
@@ -165,6 +173,8 @@ export interface ChatResponse {
     tone?: string;
     duration?: string;
   };
+  discoveryAnswers?: Record<string, string>;
+  readyForDiscovery: boolean;
   readyForHooks: boolean;
 }
 
@@ -225,10 +235,12 @@ export interface ContentResponse {
 export async function chat(
   userMessage: string,
   conversationHistory: Array<{ role: string; content: string }>,
-  currentInputs: Record<string, unknown>
+  currentInputs: Record<string, unknown>,
+  discoveryComplete?: boolean
 ): Promise<ChatResponse> {
   try {
     const contextMessage = `Current gathered inputs: ${JSON.stringify(currentInputs)}
+Discovery phase completed: ${discoveryComplete ? 'yes' : 'no'}
     
 User message: ${userMessage}`;
 
@@ -259,11 +271,14 @@ User message: ${userMessage}`;
       return {
         message: parsed.message || "I'm processing your request...",
         extractedInputs: parsed.extractedInputs,
+        discoveryAnswers: parsed.discoveryAnswers,
+        readyForDiscovery: parsed.readyForDiscovery || false,
         readyForHooks: parsed.readyForHooks || false
       };
     } catch {
       return {
         message: text || "I'm here to help you create amazing content. What topic would you like to explore?",
+        readyForDiscovery: false,
         readyForHooks: false
       };
     }
@@ -519,13 +534,18 @@ export async function generateTextHooks(
   try {
     const topic = (inputs.topic as string) || 'general content';
     const niche = `${topic} ${inputs.targetAudience || ''} ${inputs.goal || ''}`;
+    const discoveryContext = (inputs.discoveryContext as string) || '';
     
     const hookPatterns = getHookPatternSummary(niche);
+
+    const discoverySection = discoveryContext 
+      ? `\n\nDEEPER CONTEXT FROM DISCOVERY:\n${discoveryContext}\n\nUse this additional context to create more targeted and personalized hooks.`
+      : '';
 
     const prompt = `${TEXT_HOOK_PROMPT}
 
 PROVEN PATTERNS FOR THIS NICHE:
-${hookPatterns}
+${hookPatterns}${discoverySection}
 
 Content Details:
 - Topic: ${inputs.topic || 'Not specified'}
@@ -561,10 +581,15 @@ export async function generateVerbalHooks(
   try {
     const topic = (inputs.topic as string) || 'general content';
     const niche = `${topic} ${inputs.targetAudience || ''} ${inputs.goal || ''}`;
+    const discoveryContext = (inputs.discoveryContext as string) || '';
     
     const hookPatterns = getHookPatternSummary(niche);
     const relevantTemplates = getRelevantHookPatterns(niche, 8);
     const templateExamples = relevantTemplates.slice(0, 5).map(t => `- "${t.template}"`).join('\n');
+
+    const discoverySection = discoveryContext 
+      ? `\n\nDEEPER CONTEXT FROM DISCOVERY:\n${discoveryContext}\n\nUse this additional context to create more targeted and personalized hooks.`
+      : '';
 
     const prompt = `${VERBAL_HOOK_PROMPT}
 
@@ -572,7 +597,7 @@ PROVEN VIRAL PATTERNS FOR THIS NICHE:
 ${hookPatterns}
 
 HIGH-PERFORMING VERBAL TEMPLATES:
-${templateExamples}
+${templateExamples}${discoverySection}
 
 Content Details:
 - Topic: ${inputs.topic || 'Not specified'}

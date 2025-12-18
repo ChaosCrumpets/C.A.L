@@ -49,7 +49,8 @@ export const userInputsSchema = z.object({
   platforms: z.array(z.enum(Platforms)).optional(),
   targetAudience: z.string().optional(),
   tone: z.string().optional(),
-  duration: z.string().optional()
+  duration: z.string().optional(),
+  discoveryContext: z.string().optional()
 });
 
 export type UserInputs = z.infer<typeof userInputsSchema>;

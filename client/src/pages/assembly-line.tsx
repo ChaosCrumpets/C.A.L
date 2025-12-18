@@ -12,6 +12,13 @@ import { ProjectStatus } from '@shared/schema';
 import type { TextHook, VerbalHook, VisualHook, ChatMessage, AgentStatus, UserInputs, VisualContext, Session } from '@shared/schema';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 
+interface DiscoveryQuestion {
+  id: string;
+  question: string;
+  answered: boolean;
+  answer?: string;
+}
+
 export default function AssemblyLine() {
   const { 
     project, 
@@ -46,6 +53,9 @@ export default function AssemblyLine() {
     lighting: undefined,
     onCamera: true
   });
+  const [discoveryQuestions, setDiscoveryQuestions] = useState<DiscoveryQuestion[]>([]);
+  const [discoveryComplete, setDiscoveryComplete] = useState(false);
+  const [isLoadingDiscovery, setIsLoadingDiscovery] = useState(false);
 
   useEffect(() => {
     if (!project) {
@@ -190,6 +200,42 @@ export default function AssemblyLine() {
     }
   }, [project, setLoading, setVisualContext, setAgents, updateAgent, setVisualHooks, setError]);
 
+  const fetchDiscoveryQuestions = useCallback(async (topic: string, intent?: string) => {
+    setIsLoadingDiscovery(true);
+    try {
+      const response = await apiRequest('POST', '/api/generate-discovery-questions', {
+        topic,
+        intent
+      });
+      const data = await response.json();
+      
+      if (data.questions && data.questions.length > 0) {
+        const questions: DiscoveryQuestion[] = data.questions.map((q: string, idx: number) => ({
+          id: `dq-${idx}`,
+          question: q,
+          answered: false
+        }));
+        setDiscoveryQuestions(questions);
+        
+        const discoveryMessage: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: `Before I generate your hooks, let me ask a few strategic questions to make your content even more powerful:\n\n${data.questions.map((q: string, i: number) => `${i + 1}. ${q}`).join('\n\n')}\n\n${data.explanation || 'Please answer any or all of these questions to help me create more targeted content.'}`,
+          timestamp: Date.now()
+        };
+        addMessage(discoveryMessage);
+        
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Discovery questions error:', error);
+      return false;
+    } finally {
+      setIsLoadingDiscovery(false);
+    }
+  }, [addMessage]);
+
   const handleSendMessage = useCallback(async (content: string) => {
     if (!project) return;
 
@@ -220,7 +266,8 @@ export default function AssemblyLine() {
         projectId: project.id,
         message: content,
         inputs: project.inputs,
-        messages: [...project.messages, userMessage]
+        messages: [...project.messages, userMessage],
+        discoveryComplete
       });
 
       const data = await response.json();
@@ -245,7 +292,19 @@ export default function AssemblyLine() {
         saveMessageToSession(sessionId, 'assistant', data.message);
       }
 
-      if (data.readyForHooks) {
+      if (data.readyForDiscovery && !discoveryComplete && discoveryQuestions.length === 0) {
+        const topic = updatedInputs.topic || (project.inputs as UserInputs).topic || '';
+        const intent = updatedInputs.goal || (project.inputs as UserInputs).goal;
+        await fetchDiscoveryQuestions(topic, intent);
+      } else if (discoveryQuestions.length > 0 && !discoveryComplete) {
+        setDiscoveryComplete(true);
+        const enrichedInputs = {
+          ...updatedInputs,
+          discoveryContext: content
+        };
+        updateInputs({ discoveryContext: content } as Partial<UserInputs>);
+        await generateTextHooks(enrichedInputs);
+      } else if (data.readyForHooks) {
         await generateTextHooks(updatedInputs);
       }
     } catch (error) {
@@ -262,7 +321,7 @@ export default function AssemblyLine() {
     } finally {
       setLoading(false);
     }
-  }, [project, addMessage, updateInputs, setLoading, setError, generateTextHooks, currentSessionId, createSession, saveMessageToSession, updateSessionData]);
+  }, [project, addMessage, updateInputs, setLoading, setError, generateTextHooks, currentSessionId, createSession, saveMessageToSession, updateSessionData, discoveryComplete, discoveryQuestions, fetchDiscoveryQuestions]);
 
   const handleSelectTextHook = useCallback(async (hook: TextHook) => {
     if (!project) return;
@@ -453,6 +512,8 @@ export default function AssemblyLine() {
       lighting: undefined,
       onCamera: true
     });
+    setDiscoveryQuestions([]);
+    setDiscoveryComplete(false);
   }, [reset, setCurrentSessionId]);
 
   if (!project) {
@@ -471,7 +532,7 @@ export default function AssemblyLine() {
             <ChatInterface
               messages={project.messages}
               onSendMessage={handleSendMessage}
-              isLoading={isLoading}
+              isLoading={isLoading || isLoadingDiscovery}
             />
           </div>
         );
