@@ -5,13 +5,29 @@
 C.A.L. is a social media content generation platform that uses AI to help creators produce high-quality short-form video content. The application guides users through a conversational workflow: gathering content requirements via chat, generating multiple hook options, allowing the user to select a hook, and then producing a complete content package including script, storyboard, B-roll suggestions, tech specs, and captions.
 
 The system follows a state-machine pattern with seven distinct phases:
-1. **inputting** - Conversational chat to gather content requirements
+1. **inputting** - Conversational chat to gather content requirements, followed by discovery questions
 2. **hook_text** - Select from 6 ranked text hooks (on-screen captions/titles)
 3. **hook_verbal** - Select from 6 ranked verbal hooks (script openers)
 4. **hook_visual** - Provide filming context, then select from 6 visual hooks (dual output: FIY filming guide + GenAI prompt)
 5. **hook_overview** - Review all 3 hook selections before final generation
 6. **generating** - AI agents produce the content package
 7. **complete** - View final output with script, storyboard, tech specs, B-roll (with AI generation prompts), and captions
+
+### Discovery Questions System
+After gathering basic inputs (topic, goal, platform), the system presents 3-5 personalized discovery questions from a database of 200+ questions across 11 categories:
+- Topic Depth (expertise level, unique perspectives)
+- Audience Insights (pain points, desired outcomes)
+- Content Style (format preferences, energy level)
+- Emotional Resonance (feelings to evoke, stories to share)
+- Authority Building (credentials, experience)
+- Practical Details (resources, timeline)
+- Differentiation (unique value, competition gaps)
+- Call to Action (desired outcomes, next steps)
+- Platform Optimization (posting habits, engagement goals)
+- Content Constraints (limitations, must-includes)
+- Trend Alignment (current trends, timely topics)
+
+The user's answers are stored as `discoveryContext` and passed to all hook generation prompts, resulting in more targeted and personalized content suggestions.
 
 ### Complete Stage Features
 The complete stage has a split-view layout:
@@ -72,6 +88,10 @@ Preferred communication style: Simple, everyday language.
 - `POST /api/generate-visual-hooks` - Generates 6 ranked visual hook options with filming context (dual output: FIY + GenAI)
 - `POST /api/generate-content-multi` - Produces full content package using all three selected hooks
 - `POST /api/edit-content` - Edits existing content output based on user message (for post-generation refinement)
+- `GET /api/query-database` - Returns all discovery questions from the database
+- `GET /api/query-database/categories` - Returns list of all question categories
+- `GET /api/query-database/category/:category` - Returns questions for a specific category
+- `POST /api/query-database/select` - AI-powered selection of relevant discovery questions based on topic/intent
 - `POST /api/generate-hooks` - (Legacy) Generates 5-6 hook options based on collected inputs
 - `POST /api/generate-content` - (Legacy) Produces full content package after single hook selection
 
